@@ -25,15 +25,11 @@ class MyGUI:
     def __write_scaler2scratchfield(self, scalar_field: ti.template()):
         for i, j in scalar_field:
             # don't like ifs but whatever
-            if scalar_field[i,j] > 0:
-                self.scratch_vizfield[i,j][0] = scalar_field[i,j]
-                self.scratch_vizfield[i,j][1] = 0
-                self.scratch_vizfield[i,j][2] = 0
-            else:
-                self.scratch_vizfield[i,j][0] = 0
-                self.scratch_vizfield[i,j][1] = 0
-                self.scratch_vizfield[i,j][2] = -scalar_field[i,j]
-    
+
+            self.scratch_vizfield[i,j][0] = ti.abs(scalar_field[i,j])
+            self.scratch_vizfield[i,j][1] = ti.abs(scalar_field[i,j])
+            self.scratch_vizfield[i,j][2] = ti.abs(scalar_field[i,j])
+
     @ti.kernel        
     def __write_vectos2scratchfield(self, vector_field: ti.template()):
         for i, j in vector_field:
@@ -47,7 +43,7 @@ class MyGUI:
             yellow = ti.abs(min(y, 0))
             self.scratch_vizfield[i,j][0] = ti.abs(x)
             self.scratch_vizfield[i,j][1] = ti.abs(y)
-            self.scratch_vizfield[i,j][2] = ti.abs(x*y)
+            self.scratch_vizfield[i,j][2] = ti.abs(z)
 
         
     def set_1d(self, scalar_field: ti.template()):
