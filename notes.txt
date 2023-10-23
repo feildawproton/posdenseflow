@@ -1,0 +1,8 @@
+this uses a causal field to spread position information over time
+- this avoids creating a time window of track information:
+    - a time window could have multiple entries from a single track or miss a track entirely
+    - tracks can come in at any time
+- diffusing track information causally allows for:
+    - the calculation of position flow with respect to time
+        - by first calculating the position gradient over position
+    - old tracks decay and spread out as we trust them less.
