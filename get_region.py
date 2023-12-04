@@ -1,6 +1,7 @@
 import pandas as pd
 import glob
 import os
+import multiprocessing as mp
 
 # folder-to-folder
 def filter_loc(df: pd.DataFrame, loc_filter_args: dict) -> pd.DataFrame:
@@ -32,10 +33,11 @@ def open_filter_combine_save(filelist: list, start_ndx: int, end_ndx: int, loc_f
         df   = filter_loc(df, loc_filter_args=loc_filter_args)
         df_list.append(df)
         
-    all_df    = pd.concat(df_list, axis=1)
-    all_df.drop_duplicates()
+    all_df    = pd.concat(df_list, axis=0)
+    #all_df.drop_duplicates()
     save_as   = save_name + ".csv"
     save_path = os.path.join(dest_dir, save_as)
+    print("saving to", save_path)
     all_df.to_csv(save_path)
     
 def filter_folder(loc_filter_args: dict):
@@ -54,17 +56,31 @@ def filter_folder(loc_filter_args: dict):
     test_start  = val_end                              # inclusive
     test_end    = test_start  + int(num_files * test_frac) # not inclusive, obv.
     
-    open_filter_combine_save(filelist=filelist, start_ndx=train_start, end_ndx=train_end, loc_filter_args=loc_filter_args, save_name="train")
-    open_filter_combine_save(filelist=filelist, start_ndx=val_start,   end_ndx=val_end,   loc_filter_args=loc_filter_args, save_name="val"  )
-    open_filter_combine_save(filelist=filelist, start_ndx=test_start,  end_ndx=test_end,  loc_filter_args=loc_filter_args, save_name="test" )
+    train_args = (filelist, train_start, train_end, loc_filter_args, "train",)
+    val_args   = (filelist, val_start,   val_end,   loc_filter_args, "val",)
+    test_args  = (filelist, test_start,  test_end,  loc_filter_args, "test" )
+    train_proc = mp.Process(target=open_filter_combine_save, args=train_args)
+    train_proc.start()
+    val_proc = mp.Process(target=open_filter_combine_save, args=val_args)
+    val_proc.start()
+    test_proc = mp.Process(target=open_filter_combine_save, args=test_args)
+    test_proc.start() 
+    
+    train_proc.join()
+    val_proc.join()
+    test_proc.join()
+    
+    #open_filter_combine_save(filelist=filelist, start_ndx=train_start, end_ndx=train_end, loc_filter_args=loc_filter_args, save_name="train")
+    #open_filter_combine_save(filelist=filelist, start_ndx=val_start,   end_ndx=val_end,   loc_filter_args=loc_filter_args, save_name="val"  )
+    #open_filter_combine_save(filelist=filelist, start_ndx=test_start,  end_ndx=test_end,  loc_filter_args=loc_filter_args, save_name="test" )
     
 if __name__ == "__main__":
     loc_filter_args = {}
     # off the east coast
-    loc_filter_args["min_lon"] = -70 
-    loc_filter_args["max_lon"] = -60
-    loc_filter_args["min_lat"] =  30
-    loc_filter_args["max_lat"] =  40
+    loc_filter_args["min_lon"] = -140 
+    loc_filter_args["max_lon"] = -120
+    loc_filter_args["min_lat"] =  10
+    loc_filter_args["max_lat"] =  30
     loc_filter_args["source_dir"] = "source_data"
     loc_filter_args["dest_dir"]   = "reduced_data"
     loc_filter_args["train_frac"] = 3./5.
