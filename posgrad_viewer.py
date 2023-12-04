@@ -3,8 +3,8 @@ import numpy as np
 from typing import Tuple
 import taichi as ti
 
-from datafeeder import DataFeeder
-from mygui import MyGUI
+from utils.datafeeder import DataFeeder
+from utils.mygui import MyGUI
 
 # if you wanted to njit some func
 # from numba import njit

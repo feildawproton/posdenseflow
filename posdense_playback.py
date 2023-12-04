@@ -3,8 +3,8 @@ import numpy as np
 from typing import Tuple
 import taichi as ti
 
-from datafeeder import DataFeeder
-from mygui import MyGUI
+from utils.datafeeder import DataFeeder
+from utils.mygui import MyGUI
 
 # if you wanted to njit some func
 # from numba import njit
@@ -171,5 +171,5 @@ if __name__ == "__main__":
     #run("jus_vabeach.csv")
     print("got this data from: https://marinecadastre.gov/ais/")
     ti.init(arch=ti.gpu) 
-    viewer = Viewer(csv_path="jus_vabeach.csv", min_field_res=1080, time_res="minutes", decay_rate=1.0)
+    viewer = Viewer(csv_path="reduced_data/jus_vabeach.csv", min_field_res=1080, time_res="minutes", decay_rate=1.0)
     viewer.run()
