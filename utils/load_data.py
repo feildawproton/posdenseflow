@@ -16,6 +16,7 @@ def __calc_vels(TXY: np.ndarray) -> np.ndarray:
         return dXY_dT
     else:
         return np.zeros((1,2))
+'''
 '''    
 def __calc_vels(T: np.ndarray, XY: np.ndarray) -> np.ndarray:
     if T.shape[0] >= 2:
@@ -26,67 +27,64 @@ def __calc_vels(T: np.ndarray, XY: np.ndarray) -> np.ndarray:
         return dXY_dT
     else:
         return np.zeros((1,2))
+'''
 
-def __get_tracks(df: pd.DataFrame) -> Tuple[list, list, float]:
+# returns a dictionary
+# where the keys are the track's mmsi
+# and the values are a float 64 numpy matrix with columns: time, lon, lat, sog
+# time is in seconds
+# lon and lat are in degrees
+# sog is in nm/hr
+def __get_tracks(df: pd.DataFrame) -> dict:
     unique_mmsi = df.MMSI.unique()
     tracks_df   = df.groupby(["MMSI"])
-    
-    tracks_mmsi = []
-    tracks_Ts   = []
-    tracks_XYs  = []
+
+    tracks_dict = {}
     for track in unique_mmsi:
         track_df    = tracks_df.get_group(track)
         track_df    = track_df.sort_values("BaseDateTime")
-        track_dtgs  = pd.to_datetime(track_df["BaseDateTime"])                # dataframe with basedatetime
-        track_times = track_dtgs.to_numpy()                                   # numpy array with datetime64 type
-        print(type(track_times[0]))
-        track_dT    = track_times[1:] - track_times[:-1]
-        print("what the heckin", track_dT, type(track_dT))
-        #track_times = track_times.astype(np.int64)
-        #track_times = track_times.astype("datetime64[s]").astype('int')        # converts to unix seconds i think in
-        #track_times = track_times.astype(np.float64)                          # convert to float 64s (to kind of prevent div by 0)
-        track_XY    = track_df[["LON", "LAT"]].to_numpy()
-        #track_TXY   = np.concatenate([np.expand_dims(track_times, axis=-1), track_pos], axis=-1)
-        tracks_Ts.append(track_times)
-        tracks_mmsi.append(track)
-        tracks_XYs.append(track_XY)
-    
-    # could be done in one loop with the above
-    # but this is slightly faster (don't get in the way of pd's groove i'd guess)
-    # perhaps we can come back here and play with where np is used and pd is used
-    tracks_maxspeeds = []
-    for ndx, track_T in enumerate(tracks_Ts):
-        track_XY  = tracks_XYs[ndx]
-        dXY_dT    = __calc_vels(T=track_T, XY=track_XY)
-        speeds    = np.linalg.norm(dXY_dT, axis=-1)
-        max_speed = np.max(speeds)
         
-        tracks_maxspeeds.append(max_speed)
-    
-    max_speed = max(tracks_maxspeeds)
-    
-    return (tracks_mmsi, tracks_Ts, tracks_XYs, max_speed)
+        # -- GET TIMES --
+        # verbose with more arrays than necessary b.c. confusing 
+        track_dtgs  = pd.to_datetime(track_df["BaseDateTime"])     # dataframe with basedatetime
+        track_times = track_dtgs.to_numpy()                        # numpy array with datetime64 type (in nano seconds)
+        track_t_f64 = track_times.astype(np.float64)               # in nanoseconds by now 64 bit floats
+        track_t_sec = np.multiply(1. / 1_000_000_000, track_t_f64) # now in seconds with 64 bit floats
+        
+        # -- GET LON, LAT, and Speed Over Ground --
+        track_XYS = track_df[["LON", "LAT", "SOG"]].to_numpy()     # in float 64s, units are degrees lon, lat and nm/hr for sog
+
+        # -- ASSEMBLE MATRIX --
+        track_len        = track_t_sec.shape[0]
+        assert track_len == track_XYS.shape[0]
+        track_TXYS       = np.zeros(shape=(track_len, 4))
+        track_TXYS[:,0]  = track_t_sec
+        track_TXYS[:,1:] = track_XYS
+        
+        # -- ADD TRACKS TO LIST --
+        tracks_dict[track] = track_TXYS
+        
+    return tracks_dict
 
 # load the ais at path
 # returns a list of track mmsi's, track (times, lons, lats), max speed for all tracks, and processing time
-def load_ais_data(path: str) -> Tuple[list, list, float, int]:#, n_procs: int):
-    tic = time.perf_counter()
+def get_ais_frompath(path: str) -> Tuple[list, list, float, int]:#, n_procs: int):
+    print("loading ais from path", path, "and processing into tracks")
+    tic     = time.perf_counter()
     
-    df  = pd.read_csv(path)
-    tracks_mmsi, tracks_Ts, tracks_XYs, max_speed = __get_tracks(df=df)
+    df          = pd.read_csv(path)
+    tracks_dict = __get_tracks(df=df)
     
-    toc = time.perf_counter()
+    toc     = time.perf_counter()
+    tic2toc = toc - tic
     
-    return (tracks_mmsi, tracks_Ts, tracks_XYs, max_speed, toc - tic)
+    print("loading ais from path", path, "and processing into float 64s took:", tic2toc)
+    
+    return tracks_dict
  
     
 if __name__ == "__main__":
 
-    path = "reduced_data/val.csv"
-    data = load_ais_data(path=path)
-    (tracks_mmsi, tracks_Ts, tracks_XYs, max_speed, proc_time) = data
-    
-    print("self reported load and process time was", proc_time)
-        
-    print("max of all speeds found to be", max_speed, "or", max_speed*60*60*60, "nautical miles per hour.  which is too damn fast")
+    path      = "../reduced_data/train.csv"
+    data_dict = get_ais_frompath(path=path)
 
