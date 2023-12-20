@@ -85,7 +85,7 @@ class Viewer:
         ## -- TAICHI FAST GUI -- ##
         #self.gui = ti.GUI("hello fast gui", (self.lon_pix, self.lat_pix), fast_gui=True)
         print("gui implemented outside of here so that we can switch destimations")
-        self.my_display = MyGUI(x=self.lon_pix, y=self.lat_pix)
+        self.my_display = MyGUI(width=self.lon_pix, height=self.lat_pix)
                 
     def __latlon2xy(self, lat: float, lon: float) -> Tuple[int, int]:
         lat_norm = (lat - self.feeder.min_lat) / self.lat_range
@@ -196,7 +196,7 @@ class Viewer:
             
             #self.my_display.set_1d(self.pos_field)
             #self.my_display.set_1d(self.abs_pos)
-            self.my_display.set_3d(self.pos_grad)
+            self.my_display.set_vectorfield_viz(self.pos_grad)
             #self.my_display.set_3d(self.time_grad)
             
             self.my_display.display()
