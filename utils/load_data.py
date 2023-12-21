@@ -6,28 +6,6 @@ import numpy as np
 import time
 #import multiprocessing as mp
 
-# expects the format [samples, [time, x, y]]
-#@njit is slower don't do it
-'''
-def __calc_vels(TXY: np.ndarray) -> np.ndarray:
-    if TXY.shape[0] >= 2:
-        dTXY   = TXY[1:, :] - TXY[:-1, :]
-        dXY_dT = np.divide(dTXY[:, 1:], np.expand_dims(dTXY[:, 0], axis=-1))
-        return dXY_dT
-    else:
-        return np.zeros((1,2))
-'''
-'''    
-def __calc_vels(T: np.ndarray, XY: np.ndarray) -> np.ndarray:
-    if T.shape[0] >= 2:
-        dT  = np.subtract(T[1:]    , T[:-1]    ) 
-        print(dT)
-        dXY = np.subtract(XY[1:, :], XY[:-1, :]) 
-        dXY_dT = np.divide(dXY, np.expand_dims(dT, axis=-1))
-        return dXY_dT
-    else:
-        return np.zeros((1,2))
-'''
 
 # returns a dictionary
 # where the keys are the track's mmsi

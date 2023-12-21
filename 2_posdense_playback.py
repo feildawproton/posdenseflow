@@ -4,14 +4,16 @@ from typing import Tuple
 import taichi as ti
 
 from utils.datafeeder import DataFeeder
-from utils.mygui import MyGUI
+from scratch.mygui import MyGUI
 
 # if you wanted to njit some func
 # from numba import njit
 # and rewrite the cpu function appropriately outside of the class below
 
-ONE_SIXTEENTH = 1 / 16.
-ONE_HALF      = 1 / 2.
+ONE_SIXTEENTH = 1. / 16.
+ONE_HALF      = 1. / 2.
+ONE_NINETH    = 1. / 9.
+ONE_SIXTH     = 1. / 6.
 
 @ti.data_oriented
 class Viewer:
@@ -65,6 +67,7 @@ class Viewer:
         self.__zero_2dscaler(self.pos_field)
         print("shape of pos_field", self.pos_field.shape, "lon and lat have flipped for easier viewing!!!")
         
+        '''
         self.abs_pos    = ti.field(dtype=ti.f32, shape=(self.lon_pix, self.lat_pix))
         self.__zero_2dscaler(self.abs_pos)
         print("created an abs pos field for easier viz and such with shape", self.abs_pos.shape)
@@ -81,6 +84,8 @@ class Viewer:
         self.time_grad  = ti.Vector.field(n=n, dtype=ti.f32, shape=(self.lon_pix, self.lat_pix))
         self.__zero_3dvector2dfield(self.time_grad)
         print("created a time-space gradient vector field with shape", self.time_grad.shape, "and n", n)
+        '''
+        
         
         ## -- TAICHI FAST GUI -- ##
         #self.gui = ti.GUI("hello fast gui", (self.lon_pix, self.lat_pix), fast_gui=True)
@@ -101,8 +106,8 @@ class Viewer:
         assert len(samples.shape) == 2
         for sample in samples:
             x, y = self.__latlon2xy(lat=sample[0], lon=sample[1])
-            #self.pos_field[x,y] += 1.0
-            self.pos_field[x,y] = 1.0
+            curr_val = self.pos_field[x,y]
+            self.pos_field[x,y] = ti.max(1.0, curr_val)
             
     def __check__all_good(self):
         # just some asserts for sanity
@@ -115,62 +120,16 @@ class Viewer:
             # if statements are lame in kernels
             # what's a better way to do this?  padding?  
             if i > 0 and j > 0 and i < (self.lon_pix - 1) and j < (self.lat_pix - 1):
-                # gaussian blur
-                b_00 = self.pos_field[i-1, j-1] * 1
-                b_10 = self.pos_field[i  , j-1] * 2
-                b_20 = self.pos_field[i+1, j-1] * 1
-                b_01 = self.pos_field[i-1, j  ] * 2
-                b_11 = self.pos_field[i  , j  ] * 4
-                b_21 = self.pos_field[i+1, j  ] * 2
-                b_02 = self.pos_field[i-1, j+1] * 1
-                b_12 = self.pos_field[i  , j+1] * 2
-                b_22 = self.pos_field[i+1, j+1] * 1
-                blur = ONE_SIXTEENTH * (b_00 + b_10 + b_20 +
-                                        b_01 + b_11 + b_21 + 
-                                        b_02 + b_12 + b_22)
-                #self.pos_field[i,j] = blur * self.decay_rate
-                self.pos_field[i,j] = self.pos_field[i,j] - self.decay_rate * blur
-                #signed = self.pos_field[i,j] - self.decay_rate * blur
-                #self.pos_field[i,j] = ti.abs(signed)
-
-    @ti.kernel
-    def __update_abspos(self):
-        for i, j in self.pos_field:
-            self.abs_pos[i,j] = ti.abs(self.pos_field[i,j])
-            
-    # takes an argument because i'm not sure we want to supply abs_pos or the wave pos
-    # pos should be a scaler at any rate
-    @ti.kernel
-    def __calc_posgrad(self, pos: ti.template()):
-        for i, j in pos:
-            # if statements are lame in kernels
-            # what's a better way to do this?  padding?  
-            if i > 0 and j > 0 and i < (self.lon_pix - 1) and j < (self.lat_pix - 1):
-                dx_0 = ((pos[i+1,j-1] - pos[i,j-1]) + (pos[i,j-1] - pos[i-1,j-1]))
-                dx_1 = ((pos[i+1,j  ] - pos[i,j  ]) + (pos[i,j  ] - pos[i-1,j  ]))
-                dx_2 = ((pos[i+1,j+1] - pos[i,j+1]) + (pos[i,j+1] - pos[i-1,j+1]))
-                dx   = (dx_0 + 2*dx_1 + dx_2) #* 0.25
-                dy_0 = ((pos[i-1,j+1] - pos[i-1,j]) + (pos[i-1,j] - pos[i-1,j-1]))
-                dy_1 = ((pos[i  ,j+1] - pos[i  ,j]) + (pos[i  ,j] - pos[i  ,j-1]))
-                dy_2 = ((pos[i+1,j+1] - pos[i+1,j]) + (pos[i+1,j] - pos[i+1,j-1]))
-                dy   = (dy_0 + 2*dy_1 + dy_2) #* 0.25
-                self.pos_grad[i,j][0] = dx_1
-                self.pos_grad[i,j][1] = dy_1
-                self.pos_grad[i,j][2] = pos[i,j]
-                
-    @ti.kernel
-    def __calc_dxdt(self):
-        for i, j in self.pos_grad:
-            self.time_grad[i,j][0] = self.last_grad[i,j][0] - self.pos_grad[i,j][0]
-            self.time_grad[i,j][1] = self.last_grad[i,j][1] - self.pos_grad[i,j][1]
-            self.time_grad[i,j][2] = self.last_grad[i,j][2] - self.pos_grad[i,j][2]
-            
-    @ti.kernel
-    def __reset_grad(self):
-        for i, j in self.pos_grad:
-            self.last_grad[i,j][0] = self.pos_grad[i,j][0]
-            self.last_grad[i,j][1] = self.pos_grad[i,j][1]
-            self.last_grad[i,j][2] = self.pos_grad[i,j][2]
+                b_10 = self.pos_field[i  , j-1] 
+                b_01 = self.pos_field[i-1, j  ] 
+                b_11 = self.pos_field[i  , j  ]
+                b_21 = self.pos_field[i+1, j  ] 
+                b_12 = self.pos_field[i  , j+1] 
+                blur = 0.2 * (       b_10 +
+                              b_01 + b_11 + b_21 + 
+                                     b_12)
+                val = blur * self.decay_rate
+                self.pos_field[i,j] = ti.min(val, 1.0)
         
     # doesn't have slicing so need to do this for 
     @ti.kernel
@@ -186,17 +145,13 @@ class Viewer:
             self.__add_samples2pos(samples)
             self.__check__all_good()  # remove later
             self.__blur_pos()
-            self.__update_abspos()
+
+            #self.__calc_posgrad(self.pos_field)
+            #self.__calc_dxdt()
+            #self.__reset_grad()
             
-            
-            self.__calc_posgrad(self.pos_field)
-            #self.__calc_posgrad(self.abs_pos)
-            self.__calc_dxdt()
-            self.__reset_grad()
-            
-            #self.my_display.set_1d(self.pos_field)
-            #self.my_display.set_1d(self.abs_pos)
-            self.my_display.set_vectorfield_viz(self.pos_grad)
+            self.my_display.set_scalarfield_viz(self.pos_field)
+            #self.my_display.set_3d(self.pos_grad)
             #self.my_display.set_3d(self.time_grad)
             
             self.my_display.display()
@@ -216,5 +171,5 @@ if __name__ == "__main__":
     #run("jus_vabeach.csv")
     print("got this data from: https://marinecadastre.gov/ais/")
     ti.init(arch=ti.gpu) 
-    viewer = Viewer(csv_path="jus_vabeach.csv", min_field_res=1080, time_res="minutes", decay_rate=2.0)
+    viewer = Viewer(csv_path="reduced_data/jus_vabeach.csv", min_field_res=1080, time_res="minutes", decay_rate=1.0)
     viewer.run()

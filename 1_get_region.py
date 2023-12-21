@@ -22,7 +22,7 @@ def filter_loc(df: pd.DataFrame, loc_filter_args: dict) -> pd.DataFrame:
 # end is not inclusive
 # save name should not include the extension
 def open_filter_combine_save(filelist: list, start_ndx: int, end_ndx: int, loc_filter_args: dict, save_name: str):
-    print("working on", save_name, "with files", start_ndx, "(inclusive) to", end_ndx, "(not inclusive)")
+    print("working on", save_name, "with files", start_ndx, "(inclusive) to", end_ndx, "(not inclusive), from pid:", os.getpid())
     dest_dir = loc_filter_args["dest_dir"]
     df_list  = []
     for ndx in range(start_ndx, end_ndx):
@@ -47,6 +47,7 @@ def filter_folder(loc_filter_args: dict):
     test_frac  = loc_filter_args["test_frac"]
     filelist   = sorted(glob.glob(os.path.join(source_dir, "*.csv")))
     num_files  = len(filelist)
+    
     print("found", num_files, "files in", source_dir)
     
     train_start = 0                                    # inclusive
@@ -59,20 +60,18 @@ def filter_folder(loc_filter_args: dict):
     train_args = (filelist, train_start, train_end, loc_filter_args, "train",)
     val_args   = (filelist, val_start,   val_end,   loc_filter_args, "val",)
     test_args  = (filelist, test_start,  test_end,  loc_filter_args, "test" )
+    
     train_proc = mp.Process(target=open_filter_combine_save, args=train_args)
+    val_proc   = mp.Process(target=open_filter_combine_save, args=val_args)
+    test_proc  = mp.Process(target=open_filter_combine_save, args=test_args)
+    
     train_proc.start()
-    val_proc = mp.Process(target=open_filter_combine_save, args=val_args)
     val_proc.start()
-    test_proc = mp.Process(target=open_filter_combine_save, args=test_args)
     test_proc.start() 
     
     train_proc.join()
     val_proc.join()
     test_proc.join()
-    
-    #open_filter_combine_save(filelist=filelist, start_ndx=train_start, end_ndx=train_end, loc_filter_args=loc_filter_args, save_name="train")
-    #open_filter_combine_save(filelist=filelist, start_ndx=val_start,   end_ndx=val_end,   loc_filter_args=loc_filter_args, save_name="val"  )
-    #open_filter_combine_save(filelist=filelist, start_ndx=test_start,  end_ndx=test_end,  loc_filter_args=loc_filter_args, save_name="test" )
     
 if __name__ == "__main__":
     loc_filter_args = {}
